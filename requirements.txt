@@ -1,7 +1,6 @@
 streamlit
-fitz
-PyMuPDF
-pdf2image
 pytesseract
+pillow
+pymupdf
+pdf2image
 pandas
-Pillow
