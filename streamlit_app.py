@@ -1,5 +1,5 @@
 import streamlit as st
-import fitz  # PyMuPDF
+import fitz
 import pytesseract
 from PIL import Image
 import io
@@ -10,42 +10,36 @@ import tempfile
 st.set_page_config(page_title="Comparador de PDF Fiscal", layout="centered")
 st.title("📄 Comparador de Campos de Notas Fiscais")
 
-# Lista de campos esperados
-fields = {
-    "FiscalDocumentNumber": "Número da NF",
-    "FiscalDocumentIssuerCNPJ": "CNPJ Emitente",
-    "FiscalDocumentCarglassCNPJ": "CNPJ Destinatário",
-    "FiscalDocumentNCM": "NCM",
-    "FiscalDocumentCFOP": "CFOP",
-    "FiscalDocumentTotal": "Valor",
-    "FiscalDocumentIPI": "IPI",
-    "FiscalDocumentST": "ICMS ST",
-    "FiscalDocumentDesconto": "Desconto",
-    "FiscalDocumentICMS": "ICMS",
-    "FiscalDocumentType": "Tipo"
+# Mapeamento com múltiplos sinônimos por campo
+field_keywords = {
+    "FiscalDocumentNumber": ["Número da NF", "NF-e", "NF:", "Nota Fiscal"],
+    "FiscalDocumentIssuerCNPJ": ["CNPJ Emitente", "Emitente CNPJ", "CNPJ do Emitente"],
+    "FiscalDocumentCarglassCNPJ": ["CNPJ Destinatário", "Destinatário CNPJ", "CNPJ do Destinatário"],
+    "FiscalDocumentNCM": ["NCM", "Código NCM"],
+    "FiscalDocumentCFOP": ["CFOP", "Código CFOP"],
+    "FiscalDocumentTotal": ["Valor Total", "Total da Nota", "VALOR TOTAL DOS SERVIÇOS"],
+    "FiscalDocumentIPI": ["IPI", "VALOR TOTAL DO IPI"],
+    "FiscalDocumentST": ["ICMS ST", "BASE DE CALCULO DO ICMS ST"],
+    "FiscalDocumentDesconto": ["Desconto"],
+    "FiscalDocumentICMS": ["ICMS", "BASE DE CALCULO DO ICMS"],
+    "FiscalDocumentType": ["Tipo de Documento", "Modelo"]
 }
 
-# Função robusta de busca por campo
-def find_field_value(keyword, text):
-    if not keyword or not isinstance(keyword, str):
-        return "Chave inválida"
-
-    if not text or not isinstance(text, str):
-        return "Texto inválido"
-
+# Busca com múltiplas opções por campo
+def find_field_value(keywords, text):
     lines = text.split("\n")
 
-    for line in lines:
-        if isinstance(line, str) and keyword.lower() in line.lower():
-            parts = line.split(":")
-            if len(parts) > 1:
-                return parts[1].strip()
-            else:
+    for keyword in keywords:
+        for line in lines:
+            if not isinstance(line, str): continue
+            if keyword.lower() in line.lower():
+                parts = line.split(":")
+                if len(parts) > 1:
+                    return parts[1].strip()
                 return line.strip()
-
     return "Não encontrado"
 
-# Função de extração de texto (OCR + texto embutido)
+# OCR + fallback para texto embutido
 def extract_text_from_pdf(uploaded_file):
     text = ""
     try:
@@ -58,7 +52,7 @@ def extract_text_from_pdf(uploaded_file):
             text += page.get_text()
 
         if text.strip() == "":
-            raise ValueError("PDF pode estar em imagem. Tentando OCR...")
+            raise ValueError("Sem texto embutido")
 
         return text
 
@@ -71,13 +65,12 @@ def extract_text_from_pdf(uploaded_file):
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
             try:
                 ocr_text = pytesseract.image_to_string(img)
-                if isinstance(ocr_text, str):
-                    text += ocr_text
-            except Exception:
+                text += ocr_text
+            except:
                 continue
         return text
 
-# Upload do PDF
+# Upload
 uploaded_file = st.file_uploader("📎 Faça upload da Nota Fiscal (PDF)", type=["pdf"])
 
 if uploaded_file:
@@ -86,14 +79,14 @@ if uploaded_file:
     extracted_text = extract_text_from_pdf(uploaded_file)
 
     if not extracted_text.strip():
-        st.error("❌ Não foi possível extrair o texto do PDF.")
+        st.error("❌ Não foi possível extrair texto do PDF.")
     else:
         extracted_data = []
-        for field, label in fields.items():
+        for field, keywords in field_keywords.items():
             try:
-                value = find_field_value(label, extracted_text)
+                value = find_field_value(keywords, extracted_text)
             except Exception:
-                value = "Erro ao extrair"
+                value = "Erro"
             extracted_data.append({"Campo": field, "Valor PDF": value})
 
         df_result = pd.DataFrame(extracted_data)
