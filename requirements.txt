@@ -1,2 +1,7 @@
-streamlit==1.35.0
-PyMuPDF==1.23.9
+streamlit
+fitz
+PyMuPDF
+pdf2image
+pytesseract
+pandas
+Pillow
