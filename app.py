@@ -3,7 +3,8 @@ import json
 import re
 import fitz  # PyMuPDF
 
-# --- Função de extração dos campos do PDF ---
+# ======== FUNÇÕES AUXILIARES ========
+
 def extract_fields_from_pdf(pdf_bytes) -> dict:
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     text = ""
@@ -28,7 +29,6 @@ def extract_fields_from_pdf(pdf_bytes) -> dict:
         "FiscalDocumentICMS": find(r"ICMS[:\s]*([\d.,]+)")
     }
 
-# --- Função para normalização dos valores ---
 def normalize(value):
     if isinstance(value, str):
         return value.replace(".", "").replace(",", ".").replace("/", "").replace("-", "").strip()
@@ -36,7 +36,6 @@ def normalize(value):
         return round(value, 2)
     return str(value).strip()
 
-# --- Função de comparação dos campos extraídos com os esperados ---
 def compare_fields(extracted: dict, expected: dict) -> list:
     result = []
     for key in expected:
@@ -52,9 +51,10 @@ def compare_fields(extracted: dict, expected: dict) -> list:
         })
     return result
 
-# --- Interface Streamlit ---
+# ======== STREAMLIT APP ========
+
 st.set_page_config(page_title="Comparador de NF", layout="wide")
-st.title("📄 Comparador de Nota Fiscal - MVP1")
+st.title("📄 Comparador de Nota Fiscal - MVP")
 
 st.markdown("Faça upload de um **PDF da Nota Fiscal** e um **JSON Espelho** com os dados corretos.")
 
@@ -62,28 +62,23 @@ pdf_file = st.file_uploader("📤 Envie o PDF da Nota Fiscal", type=["pdf"])
 json_file = st.file_uploader("📤 Envie o JSON Espelho", type=["json"])
 
 if pdf_file and json_file:
-    # Extração do PDF
     with st.spinner("🔍 Extraindo dados do PDF..."):
         pdf_bytes = pdf_file.read()
         extracted_data = extract_fields_from_pdf(pdf_bytes)
 
-    # Leitura do JSON Espelho
     try:
         json_data = json.load(json_file)
         expected_data = json_data.get("fiscalDocument", {})
     except Exception as e:
-        st.error(f"❌ Erro ao ler o JSON: {e}")
+        st.error(f"Erro ao ler o JSON: {e}")
         st.stop()
 
-    # Comparação
     with st.spinner("🧠 Comparando campos..."):
         comparison_result = compare_fields(extracted_data, expected_data)
 
-    # Resultado
     st.subheader("🧾 Resultado da Comparação")
     st.table(comparison_result)
 
-    # JSON gerado (opcional download)
     result_json = {
         "pdfExtracted": extracted_data,
         "expected": expected_data,
@@ -92,7 +87,7 @@ if pdf_file and json_file:
 
     st.download_button(
         label="📥 Baixar resultado em JSON",
-        data=json.dumps(result_json, indent=2, ensure_ascii=False),
+        data=json.dumps(result_json, indent=2),
         file_name="resultado_comparacao.json",
         mime="application/json"
     )
