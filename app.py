@@ -15,15 +15,15 @@ json_file = st.file_uploader("📤 Envie o JSON Espelho", type=["json"])
 if pdf_file and json_file:
     # Extração do PDF
     with st.spinner("🔍 Extraindo dados do PDF..."):
-        pdf_text = pdf_file.read()
-        extracted_data = extract_fields_from_pdf(pdf_text)
+        pdf_bytes = pdf_file.read()
+        extracted_data = extract_fields_from_pdf(pdf_bytes)
 
     # Leitura do JSON Espelho
     try:
         json_data = json.load(json_file)
         expected_data = json_data.get("fiscalDocument", {})
     except Exception as e:
-        st.error(f"Erro ao ler o JSON: {e}")
+        st.error(f"❌ Erro ao ler o JSON: {e}")
         st.stop()
 
     # Comparação
@@ -43,7 +43,7 @@ if pdf_file and json_file:
 
     st.download_button(
         label="📥 Baixar resultado em JSON",
-        data=json.dumps(result_json, indent=2),
+        data=json.dumps(result_json, indent=2, ensure_ascii=False),
         file_name="resultado_comparacao.json",
         mime="application/json"
     )
