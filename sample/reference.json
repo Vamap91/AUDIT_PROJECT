@@ -1,0 +1,15 @@
+{
+  "fiscalDocument": {
+    "FiscalDocumentNumber": "NÃO INFORMADO",
+    "FiscalDocumentIssuerCNPJ": "29203140000220",
+    "FiscalDocumentCarglassCNPJ": "68062827000163",
+    "FiscalDocumentNCM": "6.933",
+    "FiscalDocumentCFOP": "NÃO INFORMADO",
+    "FiscalDocumentTotal": 902.00,
+    "FiscalDocumentType": "NotaServico",
+    "FiscalDocumentIPI": 0.00,
+    "FiscalDocumentST": 0.00,
+    "FiscalDocumentDesconto": 0.00,
+    "FiscalDocumentICMS": 0.00
+  }
+}
