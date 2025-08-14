@@ -1,75 +1,109 @@
 import streamlit as st
 import fitz  # PyMuPDF
 import pytesseract
-from pdf2image import convert_from_bytes
 from PIL import Image
-import json
-import pandas as pd
 import io
+import pandas as pd
+import json
+import tempfile
 
-st.set_page_config(page_title="Comparador de PDFs", layout="wide")
-st.title("📄 Comparador de Campos Fiscais em PDF")
+st.set_page_config(page_title="Comparador de PDF Fiscal", layout="centered")
+st.title("📄 Comparador de Campos de Notas Fiscais")
 
-# 📅 Upload
-pdf_file = st.file_uploader("Selecione o PDF para análise", type=["pdf"])
+# Lista de campos esperados
+fields = {
+    "FiscalDocumentNumber": "Número da NF",
+    "FiscalDocumentIssuerCNPJ": "CNPJ Emitente",
+    "FiscalDocumentCarglassCNPJ": "CNPJ Destinatário",
+    "FiscalDocumentNCM": "NCM",
+    "FiscalDocumentCFOP": "CFOP",
+    "FiscalDocumentTotal": "Valor",
+    "FiscalDocumentIPI": "IPI",
+    "FiscalDocumentST": "ICMS ST",
+    "FiscalDocumentDesconto": "Desconto",
+    "FiscalDocumentICMS": "ICMS",
+    "FiscalDocumentType": "Tipo"
+}
 
-# 📚 Carregar referência
-def load_reference():
-    with open("sample/reference.json", encoding="utf-8") as f:
-        return json.load(f)
+# Função robusta de busca por campo
+def find_field_value(keyword, text):
+    if not keyword or not isinstance(keyword, str):
+        return "Chave inválida"
 
-# 📖 Tenta extrair texto do PDF diretamente
-def extract_text_from_pdf(pdf_bytes):
-    text = ""
-    doc = fitz.open("pdf", pdf_bytes)
-    for page in doc:
-        text += page.get_text()
-    return text.strip()
+    if not text or not isinstance(text, str):
+        return "Texto inválido"
 
-# 🖼️ Se falhar, tenta OCR página a página
-def extract_text_with_ocr(pdf_bytes):
-    images = convert_from_bytes(pdf_bytes)
-    text = ""
-    for img in images:
-        gray = img.convert("L")  # grayscale
-        text += pytesseract.image_to_string(gray, lang="por")
-    return text
+    lines = text.split("\n")
 
-# 🔍 Função para buscar valores com base em palavras-chave
-def find_field_value(keyword, content):
-    lines = content.split("\n")
     for line in lines:
-        if keyword.lower() in line.lower():
+        if isinstance(line, str) and keyword.lower() in line.lower():
             parts = line.split(":")
             if len(parts) > 1:
-                return parts[-1].strip()
-            return line.strip()
+                return parts[1].strip()
+            else:
+                return line.strip()
+
     return "Não encontrado"
 
-if pdf_file:
-    reference = load_reference()
-    pdf_bytes = pdf_file.read()
+# Função de extração de texto (OCR + texto embutido)
+def extract_text_from_pdf(uploaded_file):
+    text = ""
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+            tmp_file.write(uploaded_file.read())
+            tmp_path = tmp_file.name
 
-    # Tentativa principal
-    text = extract_text_from_pdf(pdf_bytes)
+        pdf_document = fitz.open(tmp_path)
+        for page in pdf_document:
+            text += page.get_text()
 
-    # Se nada for extraído, fallback OCR
-    if not text.strip():
-        st.warning("Texto não encontrado via extração direta. Utilizando OCR...")
-        text = extract_text_with_ocr(pdf_bytes)
+        if text.strip() == "":
+            raise ValueError("PDF pode estar em imagem. Tentando OCR...")
 
-    # Comparar campos
-    results = []
-    for field_key, keyword in reference.items():
-        value = find_field_value(keyword, text)
-        results.append({"Campo": field_key, "Valor PDF": value})
+        return text
 
-    df_result = pd.DataFrame(results)
+    except Exception:
+        st.warning("🔍 Conteúdo textual não encontrado, aplicando OCR...")
+        text = ""
+        pdf_document = fitz.open("pdf", uploaded_file.read())
+        for page in pdf_document:
+            pix = page.get_pixmap()
+            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            try:
+                ocr_text = pytesseract.image_to_string(img)
+                if isinstance(ocr_text, str):
+                    text += ocr_text
+            except Exception:
+                continue
+        return text
 
-    # 💾 Mostrar resultados
-    st.subheader("📋 Resultado da Comparação")
-    st.dataframe(df_result, use_container_width=True)
+# Upload do PDF
+uploaded_file = st.file_uploader("📎 Faça upload da Nota Fiscal (PDF)", type=["pdf"])
 
-    # 📥 Download em JSON
-    json_data = json.dumps(results, indent=2, ensure_ascii=False)
-    st.download_button("📥 Baixar resultado em JSON", json_data, file_name="resultado_comparacao.json", mime="application/json")
+if uploaded_file:
+    st.success("✅ PDF carregado com sucesso!")
+
+    extracted_text = extract_text_from_pdf(uploaded_file)
+
+    if not extracted_text.strip():
+        st.error("❌ Não foi possível extrair o texto do PDF.")
+    else:
+        extracted_data = []
+        for field, label in fields.items():
+            try:
+                value = find_field_value(label, extracted_text)
+            except Exception:
+                value = "Erro ao extrair"
+            extracted_data.append({"Campo": field, "Valor PDF": value})
+
+        df_result = pd.DataFrame(extracted_data)
+
+        st.subheader("📊 Resultado da Comparação")
+        st.dataframe(df_result, use_container_width=True)
+
+        st.download_button(
+            "📥 Baixar resultado em JSON",
+            data=json.dumps(extracted_data, indent=2),
+            file_name="resultado.json",
+            mime="application/json"
+        )
