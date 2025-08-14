@@ -10,15 +10,15 @@ import io
 st.set_page_config(page_title="Comparador de PDFs", layout="wide")
 st.title("📄 Comparador de Campos Fiscais em PDF")
 
-# 📥 Upload
+# 📅 Upload
 pdf_file = st.file_uploader("Selecione o PDF para análise", type=["pdf"])
 
 # 📚 Carregar referência
 def load_reference():
-    with open("reference.json", encoding="utf-8") as f:
+    with open("sample/reference.json", encoding="utf-8") as f:
         return json.load(f)
 
-# 🧾 Tenta extrair texto do PDF diretamente
+# 📖 Tenta extrair texto do PDF diretamente
 def extract_text_from_pdf(pdf_bytes):
     text = ""
     doc = fitz.open("pdf", pdf_bytes)
@@ -66,10 +66,10 @@ if pdf_file:
 
     df_result = pd.DataFrame(results)
 
-    # 🧾 Mostrar resultados
+    # 💾 Mostrar resultados
     st.subheader("📋 Resultado da Comparação")
     st.dataframe(df_result, use_container_width=True)
 
-    # 💾 Download em JSON
+    # 📥 Download em JSON
     json_data = json.dumps(results, indent=2, ensure_ascii=False)
     st.download_button("📥 Baixar resultado em JSON", json_data, file_name="resultado_comparacao.json", mime="application/json")
